@@ -11,6 +11,7 @@ import {
   type SceneGraph,
   type SidebarTab,
 } from '@pascal-app/editor'
+import type { CatalogItem } from '@pascal-app/editor/catalog'
 import { PascalWebXRButton } from '@webxr/plugin/pascal-editor'
 import { Hammer, Layers, Package, Palette, Settings } from 'lucide-react'
 import Image from 'next/image'
@@ -45,11 +46,74 @@ export interface SceneMeta {
   nodeCount: number
 }
 
-// The open-source editor only ships the built-in catalog (no uploaded items),
-// so the item source chips and tag filters add nothing — drop them and keep
-// the panel to plain categories.
+/** One entry of the external catalog served by app/catalog-assets/catalog.json. */
+type ExternalCatalogItem = {
+  id: string
+  name: string
+  /** Must be one of the editor's catalog categories, e.g. `furniture` or `outdoor`. */
+  category: string
+  /** Model file, relative to the catalog directory. */
+  file: string
+  /** Preview image, relative to the catalog directory. */
+  thumbnail?: string
+  tags?: string[]
+  dimensions?: [number, number, number]
+  scale?: number
+}
+
+/**
+ * Items of the external catalog, polled every few seconds so a newly published
+ * item appears without reloading. `undefined` (no source, or no answer) keeps
+ * the built-in catalog.
+ */
+function useExternalCatalogItems(): CatalogItem[] | undefined {
+  const [items, setItems] = useState<CatalogItem[] | undefined>(undefined)
+  useEffect(() => {
+    let active = true
+    const read = async () => {
+      try {
+        const response = await fetch('/catalog-assets/catalog.json', { cache: 'no-store' })
+        if (!response.ok) return
+        const data = (await response.json()) as { items?: ExternalCatalogItem[] }
+        if (!active || !data.items?.length) return
+        setItems(
+          data.items.map((item) => {
+            const scale = item.scale ?? 1
+            return {
+              id: `external-${item.id}`,
+              category: item.category,
+              name: item.name,
+              tags: ['external', ...(item.tags ?? [])],
+              thumbnail: item.thumbnail ? `/catalog-assets/${item.thumbnail}` : undefined,
+              src: `/catalog-assets/${item.file}`,
+              dimensions: item.dimensions ?? [1, 1, 1],
+              offset: [0, 0, 0],
+              rotation: [0, 0, 0],
+              scale: [scale, scale, scale],
+              source: 'community',
+            } as CatalogItem
+          }),
+        )
+      } catch {
+        // The source does not answer: the built-in catalog stays.
+      }
+    }
+    void read()
+    const timer = setInterval(read, 5000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [])
+  return items
+}
+
+// The open-source editor ships the built-in catalog. When an external catalog
+// source is configured (CATALOG_ASSETS_SOURCE_URL), its items replace it. The
+// item source chips and tag filters add nothing, so they stay hidden.
 function EditorItemsPanel() {
-  return <ItemsPanel showSourceFilter={false} showTagFilters={false} />
+  const external = useExternalCatalogItems()
+  return <ItemsPanel items={external} showSourceFilter={false} showTagFilters={false} />
 }
 
 const SIDEBAR_TABS: (Omit<SidebarTab, 'label'> & {
