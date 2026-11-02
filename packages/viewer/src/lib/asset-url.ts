@@ -2,6 +2,9 @@ import { loadAssetUrl, resolveArtifactUrl } from '@pascal-app/core'
 
 export const ASSETS_CDN_URL = process.env.NEXT_PUBLIC_ASSETS_CDN_URL || 'https://editor.pascal.app'
 
+/** App-relative paths under this prefix are served by the host app itself (app/catalog-assets), never by the CDN. */
+export const LOCAL_ASSET_PREFIX = '/catalog-assets/'
+
 /**
  * Resolves an asset URL to the appropriate format:
  * - If URL starts with http:// or https://, return as-is (external URL)
@@ -23,6 +26,9 @@ export async function resolveAssetUrl(url: string | undefined | null): Promise<s
   if (url.startsWith('asset://')) {
     return loadAssetUrl(url)
   }
+
+  // Served by the host app itself, not by the CDN
+  if (url.startsWith(LOCAL_ASSET_PREFIX)) return url
 
   // Absolute or relative path - prepend CDN URL
   const normalizedPath = url.startsWith('/') ? url : `/${url}`
@@ -49,6 +55,9 @@ export function resolveCdnUrl(url: string | undefined | null): string | null {
     console.warn('Use resolveAssetUrl() for asset:// URLs, not resolveCdnUrl()')
     return null
   }
+
+  // Served by the host app itself, not by the CDN
+  if (url.startsWith(LOCAL_ASSET_PREFIX)) return url
 
   // Absolute or relative path - prepend CDN URL
   const normalizedPath = url.startsWith('/') ? url : `/${url}`
