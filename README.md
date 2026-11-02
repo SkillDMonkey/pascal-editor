@@ -1,5 +1,7 @@
 # Pascal Editor
 
+Community fork of pascalorg/editor (MIT).
+
 An open-source, local-first 3D building editor built with React Three Fiber and
 WebGPU. Run it in the browser or from the CLI, and connect AI agents through MCP.
 
